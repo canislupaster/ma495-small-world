@@ -3,7 +3,6 @@
 #include <random>
 #include <fstream>
 #include <set>
-#include <stdexcept>
 #include <unordered_set>
 #include <vector>
 
@@ -56,15 +55,15 @@ int main(int argc, char** argv) {
 		cout<<"accounting for staying home while sick\n";
 	}
 
-	constexpr int n = 2000, m = 10;
-	constexpr double rewire_prob = 0.2, initial_infection_prob=0.1;
-	constexpr int K=7;
+	constexpr int n = 2000, m = 20;
+	constexpr double rewire_prob = 0.15, initial_infection_prob=0.1;
+	constexpr int K=10;
 
 	constexpr int num_days = 100;
-	constexpr int time_steps_in_day = 1000;
+	constexpr int time_steps_in_day = 50;
 	constexpr int plot_every_time_step = 50;
-	constexpr double day_person_infection_rate = 0.05;
-	constexpr double day_person_recovery_rate = 0.05;
+	constexpr double day_person_infection_rate = 0.03;
+	constexpr double day_person_recovery_rate = 0.2;
 	constexpr int num_trials = 10;
 
 	vector<int> total_infected(num_days*time_steps_in_day/plot_every_time_step, 0);
@@ -128,9 +127,12 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		cout<<"Clustering coefficients:\n"<<Statistics(std::move(clustering_coefficients))<<"\n";
+		Statistics cluster_stat(std::move(clustering_coefficients));
+		Statistics path_stat(std::move(path_length));
+		cout<<"Clustering coefficients:\n"<<cluster_stat<<"\n";
 		cout<<"Vertex degree:\n"<<Statistics(std::move(degree))<<"\n";
-		cout<<"Path length:\n"<<Statistics(std::move(path_length))<<"\n";
+		cout<<"Path length:\n"<<path_stat<<"\n";
+		cout<<"Small world coefficient: "<< cluster_stat.mean/(1.0*m/n) / (path_stat.mean/(log(n)/log(m))) <<"\n";
 
 		double time_step_infection_rate = 1-pow(1-day_person_infection_rate, 1.0/time_steps_in_day);
 		double time_step_recovery_rate = 1-pow(1-day_person_recovery_rate, 1.0/time_steps_in_day);
@@ -154,10 +156,9 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		vector<int> degs(n,0);//, core(n);
+		vector<int> degs(n,0);
 		auto process_infected_to_susceptible = [&](int i) {
 			if (stay_home) {
-				// int k=1;
 				int k = uniform_int_distribution<>(1,K)(rng);
 				for (int x: edges[i]) degs[x]=1;
 
@@ -170,12 +171,10 @@ int main(int argc, char** argv) {
 					left.insert({ degs[x],x });
 				}
 
-				// while (true) {
 				while (left.size() && (*left.begin())[0]<k) {
 					int x = (*left.begin())[1];
 					left.erase(left.begin());
 					degs[x]=0;
-					// core[x]=k;
 
 					for (int y: edges[x]) {
 						if (degs[y]>0) {
@@ -185,19 +184,12 @@ int main(int argc, char** argv) {
 					}
 				}
 
-				// 	if (left.empty()) break;
-				// 	k++;
-				// }
-
 				for (int x: edges[i]) degs[x]=0;
 
 				for (auto [deg, x]: left) {
 					if (state[x]==State::Susceptible)
 						infected_to_susceptible[i].push_back(x);
 				}
-				// for (int x: all) {
-				// 	if (core[x]==k) infected_to_susceptible[i].push_back(x);
-				// }
 			} else {
 				for (int x: edges[i]) {
 					if (state[x]==State::Susceptible)
@@ -298,6 +290,6 @@ set ytics format "%.0f%%"
 set grid ls 2 linecolor "gray90" linewidth 0.5 dashtype solid
 
 plot $DATA using 1:2 with lines title 'SIR model (infected)', $DATA using 1:3 with lines title 'SIR model (susceptible)', $DATA using 1:4 with lines title 'SIR model (recovered)'
-	)EOF", num_days, n, stay_home ? " (with some students staying home)" : "");
+	)EOF", num_days, n, stay_home ? "\\n{/*0.8 (with some students staying home)}" : "");
 }
  
